@@ -11,4 +11,4 @@ images:
   - name: hello-node-app
     newTag: dev
   - name: hello-node-frontend
-    newTag: dev
+    newTag: dev-6ea59ca
