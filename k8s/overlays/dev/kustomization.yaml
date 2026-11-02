@@ -4,7 +4,7 @@ resources:
   - ../../base
 replicas:
   - name: hello-node-app
-    count: 1
+    count: 3
 images:
   - name: hello-node-app
     newTag: dev
