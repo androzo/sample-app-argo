@@ -1,0 +1,26 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: hello-node-app
+  labels:
+    app.kubernetes.io/name: hello-node-app
+    app.kubernetes.io/component: api
+spec:
+  minAvailable: 4
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hello-node-app
+      app.kubernetes.io/component: api
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: hello-node-frontend
+  labels:
+    app.kubernetes.io/name: hello-node-frontend
+    app.kubernetes.io/component: frontend
+spec:
+  minAvailable: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hello-node-frontend

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Notas — sample-app-argo</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4efe6;
+        --ink: #1c1915;
+        --muted: #6b6258;
+        --card: #fffdf8;
+        --line: #e4d9c8;
+        --accent: #c45c26;
+        --accent-ink: #fff;
+        --ok: #2f6f4e;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        background:
+          radial-gradient(circle at top left, #f8d9b8 0, transparent 40%),
+          var(--bg);
+        color: var(--ink);
+      }
+      main {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 32px 20px 64px;
+      }
+      header h1 {
+        margin: 0 0 8px;
+        font-size: 2.2rem;
+      }
+      header p {
+        margin: 0;
+        color: var(--muted);
+      }
+      .panel {
+        margin-top: 28px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 12px 30px rgba(28, 25, 21, 0.06);
+      }
+      form {
+        display: grid;
+        gap: 12px;
+      }
+      input, textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        font: inherit;
+        background: #fff;
+      }
+      textarea { min-height: 90px; resize: vertical; }
+      .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 10px 16px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .primary { background: var(--accent); color: var(--accent-ink); }
+      .ghost { background: transparent; color: var(--muted); }
+      .danger { background: #8a2f2f; color: #fff; }
+      .meta {
+        margin-top: 12px;
+        font-size: 0.92rem;
+        color: var(--ok);
+      }
+      .note {
+        padding: 16px 0;
+        border-top: 1px solid var(--line);
+      }
+      .note:first-child { border-top: 0; }
+      .note h2 {
+        margin: 0 0 6px;
+        font-size: 1.2rem;
+      }
+      .note p { margin: 0 0 10px; white-space: pre-wrap; }
+      .empty { color: var(--muted); }
+      .error { color: #8a2f2f; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Quadro de notas</h1>
+        <p>CRUD simples no Postgres, atrás de vários pods de API e frontend.</p>
+      </header>
+
+      <section class="panel">
+        <form id="note-form">
+          <input type="hidden" id="note-id" />
+          <input id="title" name="title" placeholder="Título" required />
+          <textarea id="body" name="body" placeholder="Texto da nota"></textarea>
+          <div class="actions">
+            <button class="primary" type="submit">Salvar nota</button>
+            <button class="ghost" id="cancel-edit" type="button" hidden>Cancelar edição</button>
+          </div>
+        </form>
+        <p class="meta" id="status">Carregando...</p>
+      </section>
+
+      <section class="panel" id="notes"></section>
+    </main>
+    <script>
+      const form = document.getElementById("note-form");
+      const notesEl = document.getElementById("notes");
+      const statusEl = document.getElementById("status");
+      const idEl = document.getElementById("note-id");
+      const titleEl = document.getElementById("title");
+      const bodyEl = document.getElementById("body");
+      const cancelEl = document.getElementById("cancel-edit");
+
+      async function request(url, options) {
+        const res = await fetch(url, options);
+        if (res.status === 204) return null;
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "request failed");
+        return data;
+      }
+
+      function resetForm() {
+        idEl.value = "";
+        titleEl.value = "";
+        bodyEl.value = "";
+        cancelEl.hidden = true;
+      }
+
+      function renderNotes(notes) {
+        if (!notes.length) {
+          notesEl.innerHTML = '<p class="empty">Nenhuma nota ainda. Crie a primeira acima.</p>';
+          return;
+        }
+        notesEl.innerHTML = notes
+          .map(
+            (note) => `
+          <article class="note" data-id="${note.id}">
+            <h2>${escapeHtml(note.title)}</h2>
+            <p>${escapeHtml(note.body || "")}</p>
+            <div class="actions">
+              <button class="ghost" data-edit="${note.id}">Editar</button>
+              <button class="danger" data-delete="${note.id}">Excluir</button>
+            </div>
+          </article>
+        `,
+          )
+          .join("");
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;");
+      }
+
+      async function refresh() {
+        const hello = await request("/api/hello");
+        const data = await request("/api/notes");
+        statusEl.textContent = `API pod: ${hello.hostname} · ${data.notes.length} nota(s)`;
+        renderNotes(data.notes);
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const payload = {
+          title: titleEl.value,
+          body: bodyEl.value,
+        };
+        const id = idEl.value;
+        if (id) {
+          await request(`/api/notes/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+        } else {
+          await request("/api/notes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+        }
+        resetForm();
+        await refresh();
+      });
+
+      cancelEl.addEventListener("click", resetForm);
+
+      notesEl.addEventListener("click", async (event) => {
+        const editId = event.target.getAttribute("data-edit");
+        const deleteId = event.target.getAttribute("data-delete");
+        if (editId) {
+          const note = await request(`/api/notes/${editId}`);
+          idEl.value = note.id;
+          titleEl.value = note.title;
+          bodyEl.value = note.body;
+          cancelEl.hidden = false;
+        }
+        if (deleteId) {
+          await request(`/api/notes/${deleteId}`, { method: "DELETE" });
+          resetForm();
+          await refresh();
+        }
+      });
+
+      refresh().catch((err) => {
+        statusEl.classList.add("error");
+        statusEl.textContent = err.message;
+      });
+    </script>
+  </body>
+</html>

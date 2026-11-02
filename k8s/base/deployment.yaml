@@ -6,7 +6,12 @@ metadata:
     app.kubernetes.io/name: hello-node-app
     app.kubernetes.io/component: api
 spec:
-  replicas: 2
+  replicas: 8
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 2
   selector:
     matchLabels:
       app.kubernetes.io/name: hello-node-app
@@ -33,6 +38,25 @@ spec:
           env:
             - name: PORT
               value: "3000"
+            - name: POSTGRES_HOST
+              value: postgres
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_DB
           livenessProbe:
             httpGet:
               path: /api/hello
@@ -41,7 +65,7 @@ spec:
             periodSeconds: 10
           readinessProbe:
             httpGet:
-              path: /api/hello
+              path: /api/healthz
               port: http
             initialDelaySeconds: 3
             periodSeconds: 5
@@ -50,7 +74,7 @@ spec:
               cpu: 200m
               memory: 128Mi
             requests:
-              cpu: 100m
+              cpu: 50m
               memory: 64Mi
           securityContext:
             allowPrivilegeEscalation: false

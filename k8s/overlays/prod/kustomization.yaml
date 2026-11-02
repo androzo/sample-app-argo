@@ -4,7 +4,11 @@ resources:
   - ../../base
 replicas:
   - name: hello-node-app
-    count: 3
+    count: 10
+  - name: hello-node-frontend
+    count: 6
 images:
   - name: hello-node-app
+    newTag: 1.0.0
+  - name: hello-node-frontend
     newTag: 1.0.0
